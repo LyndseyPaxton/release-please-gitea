@@ -25,6 +25,9 @@ import {PullRequestTitle} from '../util/pull-request-title';
 import {PullRequestBody} from '../util/pull-request-body';
 import {BranchName} from '../util/branch-name';
 import {GiteaTagSummary} from './types';
+import {Updater} from '../update';
+import {PackageJson} from '../updaters/node/package-json';
+import {PackageLockJson} from '../updaters/node/package-lock-json';
 
 export interface ReleasePlanOptions {
   readonly targetBranch?: string;
@@ -300,7 +303,7 @@ export class GiteaReleasePlanner {
     const encodedContent = Buffer.from(updatedContent, 'utf8').toString('base64');
     const commitMessage = pullRequestTitle;
 
-    return [
+    const updates: PlannedFileUpdate[] = [
       {
         path: changelogPath,
         content: encodedContent,
@@ -308,5 +311,60 @@ export class GiteaReleasePlanner {
         message: commitMessage,
       },
     ];
+
+    const packageJsonUpdate = await this.planFileUpdate(
+      'package.json',
+      new PackageJson({version: nextVersion}),
+      targetBranch,
+      commitMessage
+    );
+    if (packageJsonUpdate) {
+      updates.push(packageJsonUpdate);
+    }
+
+    const packageLockUpdate = await this.planFileUpdate(
+      'package-lock.json',
+      new PackageLockJson({version: nextVersion}),
+      targetBranch,
+      commitMessage
+    );
+    if (packageLockUpdate) {
+      updates.push(packageLockUpdate);
+    }
+
+    return updates;
+  }
+
+  private async planFileUpdate(
+    filePath: string,
+    updater: Updater,
+    ref: string,
+    commitMessage: string
+  ): Promise<PlannedFileUpdate | undefined> {
+    const existingFile = await this.client.getFileContents({
+      filePath,
+      ref,
+    });
+    if (!existingFile) {
+      return undefined;
+    }
+
+    const encoding =
+      existingFile.encoding && Buffer.isEncoding(existingFile.encoding)
+        ? existingFile.encoding
+        : 'base64';
+    const original = Buffer.from(existingFile.content, encoding).toString('utf8');
+    const updated = updater.updateContent(original, this.logger);
+
+    if (updated === original) {
+      return undefined;
+    }
+
+    return {
+      path: filePath,
+      content: Buffer.from(updated, 'utf8').toString('base64'),
+      sha: existingFile.sha,
+      message: commitMessage,
+    };
   }
 }
