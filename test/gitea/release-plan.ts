@@ -83,6 +83,45 @@ describe('GiteaReleasePlanner', () => {
         encoding: 'base64',
       });
 
+    const packageJson = Buffer.from(
+      JSON.stringify({name: 'demo', version: '1.2.0'}, null, 2)
+    ).toString('base64');
+
+    nock('https://gitea.example')
+      .get('/api/v1/repos/octo/demo/contents/package.json')
+      .query({ref: 'main'})
+      .reply(200, {
+        sha: 'pkgjsonsha',
+        path: 'package.json',
+        content: packageJson,
+        encoding: 'base64',
+      });
+
+    const packageLockJson = Buffer.from(
+      JSON.stringify(
+        {
+          name: 'demo',
+          version: '1.2.0',
+          lockfileVersion: 2,
+          packages: {
+            '': {name: 'demo', version: '1.2.0'},
+          },
+        },
+        null,
+        2
+      )
+    ).toString('base64');
+
+    nock('https://gitea.example')
+      .get('/api/v1/repos/octo/demo/contents/package-lock.json')
+      .query({ref: 'main'})
+      .reply(200, {
+        sha: 'pkglocksha',
+        path: 'package-lock.json',
+        content: packageLockJson,
+        encoding: 'base64',
+      });
+
     const planner = new GiteaReleasePlanner(client);
     const plan: ReleasePlan = await planner.buildReleasePlan();
 
@@ -91,11 +130,30 @@ describe('GiteaReleasePlanner', () => {
     expect(plan.currentTag).to.equal('v1.3.0');
     expect(plan.pullRequestTitle).to.equal('chore(main): release 1.3.0');
     expect(plan.headBranchName).to.equal('release-please--branches--main');
-    expect(plan.updates).to.have.length(1);
-    expect(plan.updates[0].sha).to.equal('changelogsha');
-    const decodedChangelog = Buffer.from(plan.updates[0].content, 'base64').toString('utf8');
+    expect(plan.updates).to.have.length(3);
+    const changelogUpdate = plan.updates.find(update => update.path === 'CHANGELOG.md');
+    expect(changelogUpdate?.sha).to.equal('changelogsha');
+    const decodedChangelog = Buffer.from(
+      changelogUpdate!.content,
+      'base64'
+    ).toString('utf8');
     expect(decodedChangelog).to.contain('### Features');
     expect(decodedChangelog).to.contain('add new capability');
+    const packageJsonUpdate = plan.updates.find(update => update.path === 'package.json');
+    expect(packageJsonUpdate?.sha).to.equal('pkgjsonsha');
+    const decodedPackageJson = JSON.parse(
+      Buffer.from(packageJsonUpdate!.content, 'base64').toString('utf8')
+    );
+    expect(decodedPackageJson.version).to.equal('1.3.0');
+    const packageLockUpdate = plan.updates.find(
+      update => update.path === 'package-lock.json'
+    );
+    expect(packageLockUpdate?.sha).to.equal('pkglocksha');
+    const decodedPackageLock = JSON.parse(
+      Buffer.from(packageLockUpdate!.content, 'base64').toString('utf8')
+    );
+    expect(decodedPackageLock.version).to.equal('1.3.0');
+    expect(decodedPackageLock.packages[''].version).to.equal('1.3.0');
     expect(plan.commits.map(commit => commit.sha)).to.deep.equal(['def456']);
   });
 
@@ -124,13 +182,27 @@ describe('GiteaReleasePlanner', () => {
       .query({ref: 'main'})
       .reply(404, {message: 'not found'});
 
+    nock('https://gitea.example')
+      .get('/api/v1/repos/octo/demo/contents/package.json')
+      .query({ref: 'main'})
+      .reply(404, {message: 'not found'});
+
+    nock('https://gitea.example')
+      .get('/api/v1/repos/octo/demo/contents/package-lock.json')
+      .query({ref: 'main'})
+      .reply(404, {message: 'not found'});
+
     const planner = new GiteaReleasePlanner(client);
     const plan = await planner.buildReleasePlan();
 
     expect(plan.previousTag).to.be.undefined;
     expect(plan.currentTag).to.equal('v0.0.1');
-    expect(plan.updates[0].sha).to.be.undefined;
-    const decodedChangelog = Buffer.from(plan.updates[0].content, 'base64').toString('utf8');
+    const changelogUpdate = plan.updates.find(update => update.path === 'CHANGELOG.md');
+    expect(changelogUpdate?.sha).to.be.undefined;
+    const decodedChangelog = Buffer.from(
+      changelogUpdate!.content,
+      'base64'
+    ).toString('utf8');
     expect(decodedChangelog).to.contain('squash bug');
   });
 });

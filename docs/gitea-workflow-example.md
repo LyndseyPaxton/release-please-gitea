@@ -1,10 +1,10 @@
 # Using release-please-gitea in a Gitea Actions workflow
 
-The new Gitea client and release planner let you recreate release-please's
-semantic versioning and changelog automation inside a self-hosted Gitea
-instance. The example below shows how to turn a push to `main` into an updated
-release branch and pull request by wiring the exported `GiteaClient` and
-`GiteaReleasePlanner` into a workflow job.
+The bundled Gitea action wraps the release planner so you do not need to wire up
+scripts manually. It installs the dependencies it needs, computes the next
+semantic version and changelog entry from Conventional Commits, updates the
+repository checkout, and opens (or updates) a release pull request against your
+chosen branch.
 
 ## Prerequisites
 
@@ -15,96 +15,34 @@ release branch and pull request by wiring the exported `GiteaClient` and
   requests.
 - Node.js 18 or newer available on the runner.
 
-## Step 1 – Add a release planning script
+## Step 1 – Reference the bundled action
 
-Create `scripts/gitea-release-plan.mjs` in your repository. The script uses the
-exported `GiteaClient` and `GiteaReleasePlanner` to calculate the next release
-plan, writes the updated files to the working tree, commits them, and finally
-opens (or updates) a pull request.
+Add the action to your workflow. Pass the PAT via the `token` input and, if
+you're running on a self-hosted instance, provide the server URL.
 
-```js
-#!/usr/bin/env node
-import {promises as fs} from 'node:fs';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
-import path from 'node:path';
-import process from 'node:process';
-import {GiteaClient, GiteaReleasePlanner} from 'release-please/build/src/gitea/index.js';
-
-const exec = promisify(execFile);
-
-async function main() {
-  const owner = process.env.GITEA_REPOSITORY_OWNER;
-  const repo = process.env.GITEA_REPOSITORY_NAME;
-  const token = process.env.GITEA_TOKEN;
-  const serverUrl = process.env.GITEA_SERVER_URL ?? 'https://gitea.example.com';
-  const defaultBranch = process.env.GITEA_REF_NAME ?? 'main';
-
-  if (!owner || !repo || !token) {
-    throw new Error('Missing required repository context or token environment variables.');
-  }
-
-  const client = await GiteaClient.create({
-    owner,
-    repo,
-    token,
-    baseUrl: `${serverUrl.replace(/\/$/, '')}/api/v1/`,
-    defaultBranch,
-  });
-  const planner = new GiteaReleasePlanner(client);
-  const plan = await planner.buildReleasePlan({targetBranch: defaultBranch});
-
-  // Apply planned file updates to the local checkout so we can create a commit.
-  for (const update of plan.updates) {
-    const filePath = path.join(process.cwd(), update.path);
-    const content = Buffer.from(update.content, 'base64').toString('utf8');
-    await fs.mkdir(path.dirname(filePath), {recursive: true});
-    await fs.writeFile(filePath, content, 'utf8');
-    await exec('git', ['add', update.path]);
-  }
-
-  // Create or update the release branch with the generated commit.
-  await exec('git', ['config', 'user.name', process.env.GIT_AUTHOR_NAME ?? 'release-please']);
-  await exec('git', ['config', 'user.email', process.env.GIT_AUTHOR_EMAIL ?? 'release-please@example.com']);
-  await exec('git', ['checkout', '-B', plan.headBranchName]);
-  try {
-    await exec('git', ['commit', '-m', plan.pullRequestTitle]);
-  } catch (err) {
-    if (err?.code === 1) {
-      console.log('No release changes detected; skipping PR creation.');
-      return;
-    }
-    throw err;
-  }
-  await exec('git', [
-    'push',
-    '--force-with-lease',
-    'origin',
-    `${plan.headBranchName}:${plan.headBranchName}`,
-  ]);
-
-  await client.createPullRequest({
-    title: plan.pullRequestTitle,
-    body: plan.pullRequestBody,
-    head: plan.headBranchName,
-    base: defaultBranch,
-  });
-}
-
-main().catch(err => {
-  console.error(err);
-  process.exitCode = 1;
-});
+```yaml
+jobs:
+  release-pr:
+    runs-on: docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Plan release PR
+        uses: LyndseyPaxton/release-please-gitea@v0
+        with:
+          token: "${{ secrets.GITEA_TOKEN }}"
+          server-url: https://gitea.example.com
 ```
 
-The planner exposes the semantic version, changelog entry, PR title, PR body,
-and base64-encoded file updates computed from Conventional Commits
-(`GiteaReleasePlanner.buildReleasePlan`).【F:src/gitea/release-plan.ts†L39-L145】【F:src/gitea/release-plan.ts†L276-L308】
+The action honours optional inputs to customise components, tag formatting, and
+changelog behaviour. See [`action.yml`](../action.yml) for the complete list of
+supported inputs.
 
-## Step 2 – Define the workflow
+## Step 2 – Full workflow example
 
-Save the workflow at `.gitea/workflows/release-please.yml` so it runs when
-changes land on your default branch.
+A full workflow typically installs dependencies for your project (if required)
+and then runs the action to maintain the release PR. Save the file below as
+`.gitea/workflows/release-please.yml`:
 
 ```yaml
 name: release-please
@@ -132,35 +70,21 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm ci
-      - name: Build release-please
-        run: npm run compile
+      - name: Build project
+        run: npm run build --if-present
       - name: Plan release PR
-        env:
-          GITEA_TOKEN: "${{ secrets.GITEA_TOKEN }}"
-          GIT_AUTHOR_NAME: release-please[bot]
-          GIT_AUTHOR_EMAIL: release-please@example.com
-        run: node scripts/gitea-release-plan.mjs
+        uses: LyndseyPaxton/release-please-gitea@v0
+        with:
+          token: "${{ secrets.GITEA_TOKEN }}"
+          server-url: https://gitea.example.com
+          git-author-name: release-please[bot]
+          git-author-email: release-please@example.com
 ```
 
-The build step (`npm run compile`) emits the compiled modules that the script
-imports from `build/src/gitea`.【F:package.json†L9-L24】 Ensure your runner has the
-`GITEA_TOKEN` secret with push and PR permissions. The workflow uses the default
-branch name (`main`) but you can adjust the trigger and `targetBranch` in the
-script for monorepos or release branches.
-
-## Step 3 – Customize as needed
-
-- Pass extra `ReleasePlanOptions` when calling `buildReleasePlan` to control tag
-  prefixes, changelog sections, or initial versions (`component`,
-  `includeVInTag`, etc.).【F:src/gitea/release-plan.ts†L43-L87】
-- Use the planned metadata (`plan.version`, `plan.currentTag`) to create a tag
-  or release using `client.createTag` / `client.createRelease` after the pull
-  request merges. The client exposes wrappers around the REST endpoints so you
-  do not need to hand-roll fetch calls.【F:src/gitea/client.ts†L188-L322】
-- Swap out the checkout/commit steps if you prefer using the Gitea REST API to
-  update files directly (`GiteaClient.updateFile`) instead of invoking `git`
-  commands.【F:src/gitea/client.ts†L229-L274】
-
-With these pieces in place your Gitea instance will continuously stage release
-pull requests based on Conventional Commits, mirroring the core release-please
-experience.
+Behind the scenes the action compiles `release-please`, applies the planner's
+file updates to the checked-out repository, creates or refreshes the release
+branch, pushes it back to the origin remote, and opens a pull request with the
+calculated version and changelog. If no Conventional Commits are found, it
+exposes a `skipped=true` output so you can gate subsequent steps. Use the
+recorded outputs to trigger follow-up automation (for example, building release
+artifacts only when a new version is proposed).【F:src/gitea/action.ts†L189-L273】

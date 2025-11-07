@@ -15,7 +15,9 @@ committed to a release branch before opening a pull request.
 4. Determine the next semantic version using the default versioning strategy.
 5. Generate a changelog entry with the same templates used by release-please.
 6. Fetch and update `CHANGELOG.md`, returning the new file content ready to be
-   pushed to a release branch.
+   pushed to a release branch. When Node.js metadata is present, the planner
+   also rewrites `package.json` and `package-lock.json` so the release pull
+   request carries version bumps alongside the changelog entry.
 7. Produce a release pull request title and body that follow the standard
    release-please conventions.
 
