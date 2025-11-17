@@ -18,9 +18,10 @@ chosen branch.
 ## Step 1 – Reference the bundled action
 
 Add the action to your workflow. Pass the PAT via the `token` input and, if
-you're running on a self-hosted instance, provide the server URL. This example
-mirrors the common GitHub usage and exposes the computed release outputs for
-follow-up jobs:
+you're running on a self-hosted instance, provide the server URL (ideally via
+the `GITEA_SERVER_URL` environment variable so local testing mirrors your
+runner). This example mirrors the common GitHub usage and exposes the computed
+release outputs for follow-up jobs:
 
 ```yaml
 name: release-please
@@ -48,7 +49,7 @@ jobs:
         uses: LyndseyPaxton/release-please-gitea@v0
         with:
           token: "${{ secrets.GITEA_TOKEN }}"
-          server-url: https://gitea.example.com
+          server-url: "${{ env.GITEA_SERVER_URL }}"
 ```
 
 The action honours optional inputs to customise components, tag formatting, and
@@ -80,7 +81,7 @@ on:
       - main
 
 env:
-  GITEA_SERVER_URL: https://gitea.example.com
+  GITEA_SERVER_URL: https://gitea.yourcompany.internal
   GITEA_REPOSITORY_OWNER: "${{ gitea.repository_owner }}"
   GITEA_REPOSITORY_NAME: "${{ gitea.repository_name }}"
   GITEA_REF_NAME: "${{ gitea.ref_name }}"
@@ -103,7 +104,7 @@ jobs:
         uses: LyndseyPaxton/release-please-gitea@v0
         with:
           token: "${{ secrets.GITEA_TOKEN }}"
-          server-url: https://gitea.example.com
+          server-url: "${{ env.GITEA_SERVER_URL }}"
           git-author-name: release-please[bot]
           git-author-email: release-please@example.com
 ```

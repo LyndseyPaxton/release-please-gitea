@@ -15,7 +15,7 @@
 import {describe, it} from 'mocha';
 import {expect} from 'chai';
 
-import {normalizeApiBaseUrl} from '../../src/gitea/action';
+import {normalizeApiBaseUrl, resolveServerUrl} from '../../src/gitea/action';
 
 describe('gitea action helpers', () => {
   describe('normalizeApiBaseUrl', () => {
@@ -48,6 +48,30 @@ describe('gitea action helpers', () => {
 
     it('throws on empty server URLs', () => {
       expect(() => normalizeApiBaseUrl('   ')).to.throw('Server URL cannot be empty.');
+    });
+  });
+
+  describe('resolveServerUrl', () => {
+    it('prefers explicit input when provided', () => {
+      const env = {INPUT_SERVER_URL: 'https://gitea.example.org'} as NodeJS.ProcessEnv;
+      expect(resolveServerUrl(env)).to.equal('https://gitea.example.org');
+    });
+
+    it('falls back to GITEA_SERVER_URL when input is missing', () => {
+      const env = {GITEA_SERVER_URL: 'https://gitea.internal'} as NodeJS.ProcessEnv;
+      expect(resolveServerUrl(env)).to.equal('https://gitea.internal');
+    });
+
+    it('replaces example.com input with GITEA_SERVER_URL when available', () => {
+      const env = {
+        INPUT_SERVER_URL: 'https://gitea.example.com',
+        GITEA_SERVER_URL: 'https://gitea.company.test',
+      } as NodeJS.ProcessEnv;
+      expect(resolveServerUrl(env)).to.equal('https://gitea.company.test');
+    });
+
+    it('uses default when nothing else is provided', () => {
+      expect(resolveServerUrl({} as NodeJS.ProcessEnv)).to.equal('https://gitea.com');
     });
   });
 });

@@ -128,12 +128,31 @@ async function appendOutput(name: string, value: string): Promise<void> {
   }
 }
 
+export function resolveServerUrl(env: NodeJS.ProcessEnv = process.env): string {
+  const inputUrl = readInput('server-url', env)?.trim();
+  const envUrl = (env.GITEA_SERVER_URL ?? env.GITHUB_SERVER_URL)?.trim();
+
+  if (!inputUrl && envUrl) {
+    return envUrl;
+  }
+
+  if (inputUrl && /example\.com/i.test(inputUrl) && envUrl) {
+    return envUrl;
+  }
+
+  if (inputUrl && inputUrl !== '') {
+    return inputUrl;
+  }
+
+  return envUrl ?? DEFAULT_SERVER_URL;
+}
+
 function resolveActionInputs(env: NodeJS.ProcessEnv = process.env): ActionInputs {
   const token = readInput('token', env) ?? env.GITEA_TOKEN;
   if (!token) {
     throw new Error('A token input or GITEA_TOKEN environment variable is required.');
   }
-  const serverUrl = readInput('server-url', env) ?? env.GITEA_SERVER_URL ?? DEFAULT_SERVER_URL;
+  const serverUrl = resolveServerUrl(env);
   const repository = resolveRepository(env);
   const defaultBranch = readInput('default-branch', env) ?? env.GITEA_REF_NAME ?? env.GITHUB_REF_NAME;
   const targetBranch = readInput('target-branch', env);
