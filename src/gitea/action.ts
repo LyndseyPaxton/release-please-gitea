@@ -136,8 +136,14 @@ export function resolveServerUrl(env: NodeJS.ProcessEnv = process.env): string {
     return envUrl;
   }
 
-  if (inputUrl && /example\.com/i.test(inputUrl) && envUrl) {
-    return envUrl;
+  if (inputUrl && /example\.com/i.test(inputUrl)) {
+    if (envUrl) {
+      return envUrl;
+    }
+    throw new Error(
+      'The server-url input is set to a placeholder (gitea.example.com). '
+      + 'Provide a real server URL input or set GITEA_SERVER_URL/GITHUB_SERVER_URL.'
+    );
   }
 
   if (inputUrl && inputUrl !== '') {

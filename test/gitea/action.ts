@@ -70,6 +70,13 @@ describe('gitea action helpers', () => {
       expect(resolveServerUrl(env)).to.equal('https://gitea.company.test');
     });
 
+    it('throws when example.com input has no environment override', () => {
+      const env = {INPUT_SERVER_URL: 'https://gitea.example.com'} as NodeJS.ProcessEnv;
+      expect(() => resolveServerUrl(env)).to.throw(
+        'The server-url input is set to a placeholder (gitea.example.com).'
+      );
+    });
+
     it('uses default when nothing else is provided', () => {
       expect(resolveServerUrl({} as NodeJS.ProcessEnv)).to.equal('https://gitea.com');
     });
