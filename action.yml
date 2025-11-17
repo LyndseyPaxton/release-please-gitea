@@ -1,0 +1,143 @@
+name: 'release-please-gitea'
+description: 'Plan and open release pull requests on Gitea using release-please logic'
+author: 'release-please-gitea maintainers'
+outputs:
+  skipped:
+    description: 'True when no release changes were detected for the target branch'
+    value: ${{ steps.run-planner.outputs.skipped }}
+  reason:
+    description: 'Optional reason explaining why the action was skipped'
+    value: ${{ steps.run-planner.outputs.reason }}
+  version:
+    description: 'Computed semantic version for the proposed release'
+    value: ${{ steps.run-planner.outputs.version }}
+  major:
+    description: 'Major component of the computed semantic version'
+    value: ${{ steps.run-planner.outputs.major }}
+  minor:
+    description: 'Minor component of the computed semantic version'
+    value: ${{ steps.run-planner.outputs.minor }}
+  patch:
+    description: 'Patch component of the computed semantic version'
+    value: ${{ steps.run-planner.outputs.patch }}
+  tag:
+    description: 'Tag name that will be used when the release PR is merged'
+    value: ${{ steps.run-planner.outputs.tag }}
+  head-branch:
+    description: 'Branch name created or refreshed for the release PR'
+    value: ${{ steps.run-planner.outputs['head-branch'] }}
+  pull-request-title:
+    description: 'Title applied to the release pull request'
+    value: ${{ steps.run-planner.outputs['pull-request-title'] }}
+  pull-request-body:
+    description: 'Body applied to the release pull request'
+    value: ${{ steps.run-planner.outputs['pull-request-body'] }}
+  pull-request-url:
+    description: 'URL of the release pull request when created'
+    value: ${{ steps.run-planner.outputs['pull-request-url'] }}
+  pull-request-number:
+    description: 'Numeric identifier of the release pull request when created'
+    value: ${{ steps.run-planner.outputs['pull-request-number'] }}
+inputs:
+  token:
+    description: 'Gitea personal access token with repository permissions'
+    required: true
+  server-url:
+    description: 'Base URL for your Gitea instance (e.g. https://gitea.example.com)'
+    required: false
+  repository:
+    description: 'Override the repository in owner/name form'
+    required: false
+  default-branch:
+    description: 'Default branch to operate against when auto-detect is unavailable'
+    required: false
+  target-branch:
+    description: 'Branch to target for the release pull request'
+    required: false
+  component:
+    description: 'Component name for monorepo releases'
+    required: false
+  include-component-in-tag:
+    description: 'Whether to include the component in generated tag names'
+    required: false
+  include-v-in-tag:
+    description: 'Whether to prefix generated tags with v'
+    required: false
+  tag-separator:
+    description: 'Custom separator between component and version in tags'
+    required: false
+  pull-request-title-pattern:
+    description: 'Template for the release pull request title'
+    required: false
+  pull-request-header:
+    description: 'Custom text injected at the top of the pull request body'
+    required: false
+  pull-request-footer:
+    description: 'Custom text injected at the bottom of the pull request body'
+    required: false
+  changelog-path:
+    description: 'Override the changelog path'
+    required: false
+  changelog-host:
+    description: 'Override the changelog host'
+    required: false
+  initial-version:
+    description: 'Version to use when no tags are present'
+    required: false
+  bump-minor-pre-major:
+    description: 'Bump minor version instead of patch for breaking changes before 1.0.0'
+    required: false
+  bump-patch-for-minor-pre-major:
+    description: 'Bump patch version for feat commits before 1.0.0'
+    required: false
+  git-author-name:
+    description: 'Author name used for the generated commit'
+    required: false
+  git-author-email:
+    description: 'Author email used for the generated commit'
+    required: false
+  push-remote:
+    description: 'Remote name to push the release branch to'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Install release-please dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci
+    - name: Compile release-please
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm run compile
+    - name: Run Gitea release planner
+      id: run-planner
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_SERVER_URL: ${{ inputs['server-url'] || env.GITEA_SERVER_URL || env.GITHUB_SERVER_URL }}
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_DEFAULT_BRANCH: ${{ inputs['default-branch'] }}
+        INPUT_TARGET_BRANCH: ${{ inputs['target-branch'] }}
+        INPUT_COMPONENT: ${{ inputs.component }}
+        INPUT_INCLUDE_COMPONENT_IN_TAG: ${{ inputs['include-component-in-tag'] }}
+        INPUT_INCLUDE_V_IN_TAG: ${{ inputs['include-v-in-tag'] }}
+        INPUT_TAG_SEPARATOR: ${{ inputs['tag-separator'] }}
+        INPUT_PULL_REQUEST_TITLE_PATTERN: ${{ inputs['pull-request-title-pattern'] }}
+        INPUT_PULL_REQUEST_HEADER: ${{ inputs['pull-request-header'] }}
+        INPUT_PULL_REQUEST_FOOTER: ${{ inputs['pull-request-footer'] }}
+        INPUT_CHANGELOG_PATH: ${{ inputs['changelog-path'] }}
+        INPUT_CHANGELOG_HOST: ${{ inputs['changelog-host'] }}
+        INPUT_INITIAL_VERSION: ${{ inputs['initial-version'] }}
+        INPUT_BUMP_MINOR_PRE_MAJOR: ${{ inputs['bump-minor-pre-major'] }}
+        INPUT_BUMP_PATCH_FOR_MINOR_PRE_MAJOR: ${{ inputs['bump-patch-for-minor-pre-major'] }}
+        INPUT_GIT_AUTHOR_NAME: ${{ inputs['git-author-name'] }}
+        INPUT_GIT_AUTHOR_EMAIL: ${{ inputs['git-author-email'] }}
+        INPUT_PUSH_REMOTE: ${{ inputs['push-remote'] }}
+        GITEA_TOKEN: ${{ inputs.token }}
+        GITEA_SERVER_URL: ${{ inputs['server-url'] || env.GITEA_SERVER_URL || env.GITHUB_SERVER_URL }}
+      run: node ${{ github.action_path }}/build/src/gitea/action.js
+branding:
+  icon: 'send'
+  color: 'blue'

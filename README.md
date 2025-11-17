@@ -8,6 +8,10 @@
 Release Please automates CHANGELOG generation, the creation of GitHub releases,
 and version bumps for your projects.
 
+> **New:** Looking to run release-please on a self-hosted Gitea instance?
+> Follow the [Gitea workflow guide](docs/gitea-workflow-example.md) to drop in the
+> bundled action and automate release PRs on Gitea.
+
 It does so by parsing your
 git history, looking for [Conventional Commit messages](https://www.conventionalcommits.org/),
 and creating release PRs.
