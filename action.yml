@@ -1,6 +1,43 @@
 name: 'release-please-gitea'
 description: 'Plan and open release pull requests on Gitea using release-please logic'
 author: 'release-please-gitea maintainers'
+outputs:
+  skipped:
+    description: 'True when no release changes were detected for the target branch'
+    value: ${{ steps.run-planner.outputs.skipped }}
+  reason:
+    description: 'Optional reason explaining why the action was skipped'
+    value: ${{ steps.run-planner.outputs.reason }}
+  version:
+    description: 'Computed semantic version for the proposed release'
+    value: ${{ steps.run-planner.outputs.version }}
+  major:
+    description: 'Major component of the computed semantic version'
+    value: ${{ steps.run-planner.outputs.major }}
+  minor:
+    description: 'Minor component of the computed semantic version'
+    value: ${{ steps.run-planner.outputs.minor }}
+  patch:
+    description: 'Patch component of the computed semantic version'
+    value: ${{ steps.run-planner.outputs.patch }}
+  tag:
+    description: 'Tag name that will be used when the release PR is merged'
+    value: ${{ steps.run-planner.outputs.tag }}
+  head-branch:
+    description: 'Branch name created or refreshed for the release PR'
+    value: ${{ steps.run-planner.outputs['head-branch'] }}
+  pull-request-title:
+    description: 'Title applied to the release pull request'
+    value: ${{ steps.run-planner.outputs['pull-request-title'] }}
+  pull-request-body:
+    description: 'Body applied to the release pull request'
+    value: ${{ steps.run-planner.outputs['pull-request-body'] }}
+  pull-request-url:
+    description: 'URL of the release pull request when created'
+    value: ${{ steps.run-planner.outputs['pull-request-url'] }}
+  pull-request-number:
+    description: 'Numeric identifier of the release pull request when created'
+    value: ${{ steps.run-planner.outputs['pull-request-number'] }}
 inputs:
   token:
     description: 'Gitea personal access token with repository permissions'
@@ -74,6 +111,7 @@ runs:
       working-directory: ${{ github.action_path }}
       run: npm run compile
     - name: Run Gitea release planner
+      id: run-planner
       shell: bash
       working-directory: ${{ github.workspace }}
       env:

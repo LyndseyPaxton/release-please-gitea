@@ -18,16 +18,33 @@ chosen branch.
 ## Step 1 – Reference the bundled action
 
 Add the action to your workflow. Pass the PAT via the `token` input and, if
-you're running on a self-hosted instance, provide the server URL.
+you're running on a self-hosted instance, provide the server URL. This example
+mirrors the common GitHub usage and exposes the computed release outputs for
+follow-up jobs:
 
 ```yaml
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+      - release/**
+
 jobs:
-  release-pr:
+  release-please:
     runs-on: docker
+    outputs:
+      release_version: ${{ steps.release-please-gitea.outputs.version }}
+      tag_name: ${{ steps.release-please-gitea.outputs.tag }}
+      major: ${{ steps.release-please-gitea.outputs.major }}
+      minor: ${{ steps.release-please-gitea.outputs.minor }}
+      patch: ${{ steps.release-please-gitea.outputs.patch }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Plan release PR
+      - name: Run release-please-gitea
+        id: release-please-gitea
         uses: LyndseyPaxton/release-please-gitea@v0
         with:
           token: "${{ secrets.GITEA_TOKEN }}"
@@ -37,6 +54,16 @@ jobs:
 The action honours optional inputs to customise components, tag formatting, and
 changelog behaviour. See [`action.yml`](../action.yml) for the complete list of
 supported inputs.
+
+Action outputs you can reference in downstream steps include:
+
+- `skipped` / `reason` – indicate when no release PR was needed.
+- `version`, `major`, `minor`, `patch` – semantic version computed from commits.
+- `tag` – tag that will be created when the release PR merges.
+- `head-branch` – release branch used for the PR.
+- `pull-request-title`, `pull-request-body`, `pull-request-url`,
+  `pull-request-number` – details for the release PR that was opened (or
+  detected).
 
 ## Step 2 – Full workflow example
 
@@ -87,4 +114,4 @@ branch, pushes it back to the origin remote, and opens a pull request with the
 calculated version and changelog. If no Conventional Commits are found, it
 exposes a `skipped=true` output so you can gate subsequent steps. Use the
 recorded outputs to trigger follow-up automation (for example, building release
-artifacts only when a new version is proposed).【F:src/gitea/action.ts†L189-L273】
+artifacts only when a new version is proposed).【F:src/gitea/action.ts†L241-L314】

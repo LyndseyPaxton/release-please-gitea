@@ -299,6 +299,9 @@ async function runAction(): Promise<void> {
 
   await appendOutput('skipped', 'false');
   await appendOutput('version', plan.version.toString());
+  await appendOutput('major', plan.version.major.toString());
+  await appendOutput('minor', plan.version.minor.toString());
+  await appendOutput('patch', plan.version.patch.toString());
   await appendOutput('tag', plan.currentTag);
   await appendOutput('head-branch', plan.headBranchName);
   await appendOutput('pull-request-title', plan.pullRequestTitle);
