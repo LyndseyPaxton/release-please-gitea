@@ -116,7 +116,7 @@ runs:
       working-directory: ${{ github.workspace }}
       env:
         INPUT_TOKEN: ${{ inputs.token }}
-        INPUT_SERVER_URL: ${{ inputs['server-url'] || env.GITEA_SERVER_URL || env.GITHUB_SERVER_URL }}
+        INPUT_SERVER_URL: ${{ env.GITEA_SERVER_URL || env.GITHUB_SERVER_URL || inputs['server-url'] }}
         INPUT_REPOSITORY: ${{ inputs.repository }}
         INPUT_DEFAULT_BRANCH: ${{ inputs['default-branch'] }}
         INPUT_TARGET_BRANCH: ${{ inputs['target-branch'] }}
@@ -136,7 +136,7 @@ runs:
         INPUT_GIT_AUTHOR_EMAIL: ${{ inputs['git-author-email'] }}
         INPUT_PUSH_REMOTE: ${{ inputs['push-remote'] }}
         GITEA_TOKEN: ${{ inputs.token }}
-        GITEA_SERVER_URL: ${{ inputs['server-url'] || env.GITEA_SERVER_URL || env.GITHUB_SERVER_URL }}
+        GITEA_SERVER_URL: ${{ env.GITEA_SERVER_URL || env.GITHUB_SERVER_URL || inputs['server-url'] }}
       run: node ${{ github.action_path }}/build/src/gitea/action.js
 branding:
   icon: 'send'
